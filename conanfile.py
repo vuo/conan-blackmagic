@@ -1,17 +1,24 @@
-from conans import ConanFile, tools
+from conans import ConanFile, CMake, tools
+import os
 import platform
 
 class BlackmagicConan(ConanFile):
     name = 'blackmagic'
 
-    source_version = '11.5.1'
+    source_version = '11.6'
     package_version = '0'
     version = '%s-%s' % (source_version, package_version)
 
+    build_requires = (
+        'llvm/5.0.2-1@vuo/stable',
+        'macos-sdk/11.0-0@vuo/stable',
+    )
     settings = 'os', 'compiler', 'build_type', 'arch'
     url = 'https://www.blackmagicdesign.com/support/'
     description = 'Video capture and playback'
+    generators = 'cmake'
     build_dir = '_build'
+    exports_sources = 'CMakeLists.txt'
 
     def requirements(self):
         if platform.system() == 'Linux':
@@ -19,8 +26,10 @@ class BlackmagicConan(ConanFile):
 
         if platform.system() == 'Darwin':
             pf = 'Mac'
+            self.libext = 'dylib'
         elif platform.system() == 'Linux':
             pf = 'Linux'
+            self.libext = 'so'
         else:
             raise Exception('Unknown platform "%s"' % platform.system())
 
@@ -29,8 +38,8 @@ class BlackmagicConan(ConanFile):
     def source(self):
         tools.mkdir('include')
         tools.mkdir('lib')
-        tools.get('https://sw.blackmagicdesign.com/DeckLink/v11.5.1/Blackmagic_DeckLink_SDK_11.5.1.zip?Key-Pair-Id=APKAJTKA3ZJMJRQITVEA&Signature=GffCQRr6q9FjZnk8uCMID5R31dsiCNGbh8w5mmy+XtDDQ+m+c5BM/hT0Yv6wE+6+1EMFq7l5RX0YTE1q1rsQaQzt1IP0C406Iu7FHlZT07yXF8A0d0HqZLJOvtrL4Z+Gxv29YetRUnUq3ijNKD6JsxisAvDLccbje1ekj7Dsv58H+FYqcFZbp+0OevpZnkfhBWB/C6hf9phtXmoV64292xxekn7VMlzJmDbNT2DAygRkryaXNeP4v8uTvD+yW7unX1ftf2xYMIJizFeI7G7o8Hsky0QKDg9DIXzyDXNWRMKQYQRGI5/3EPG3xXto8ILkDU5Vg9jy70Jo66IRG4uw7A==&Expires=1588731623',
-            sha256='60df0abb766c724c5c60cd44f1ff9715725ed79ee0a8e3ffef34c4d24ba5811f',
+        tools.get('https://sw.blackmagicdesign.com/DeckLink/v11.6/Blackmagic_DeckLink_SDK_11.6.zip?Key-Pair-Id=APKAJTKA3ZJMJRQITVEA&Signature=bbLJJfKW8rXlPCA30sw0Q1N47ODcfmBkcVlK8KQ9ReWgSJ8NdGj118Lx5WgEB9Ee5oSWQp6y9Psk4lLT9dNF2GkTQFzFkcYMmr0RaCI6nINen3Hem1XkuwhFNsDCoDUsh8PCI0aVZ8QQoADGfhHe8Ui2HJtAjkFkybX1hXWc62V/3CaBSSU83Gtl1qWWSaXU1jDILnzdt0sQ619hXghGzuVP9rDim5GukzysrORgChJJv5Al2S7QUaAd/cPYweSm1Ms7Nr+qlOxzVnaXrn28NHBLNmgvTrCRiipxOlWBSp++mzHUFK/wOU/YgHrepNp7dRQ80q/6nxjKbvVafl8LPA==&Expires=1604983396',
+            sha256='2cecde0b6af98ef3cefa425ec0595849fb30a26da4063becd80582dbc0483183',
             filename='sdk.zip')
 
         self.run('mv "%s/include"/*.h include' % self.platformDir)
@@ -38,22 +47,28 @@ class BlackmagicConan(ConanFile):
         self.run('rm include/*_v[0-9]*.h')
 
     def build(self):
-        if platform.system() == 'Darwin':
-            self.libext = 'dylib'
-            platformBuild = '-dynamiclib -framework CoreFoundation -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk -mmacosx-version-min=10.10'
-        elif platform.system() == 'Linux':
-            self.libext = 'so'
-            platformBuild = '-shared -fPIC -lpthread -ldl'
-        else:
-            raise Exception('Unknown platform "%s"' % platform.system())
+        cmake = CMake(self)
+        cmake.definitions['CONAN_DISABLE_CHECK_COMPILER'] = True
+        cmake.definitions['CMAKE_BUILD_TYPE'] = 'Release'
+        cmake.definitions['CMAKE_C_COMPILER'] = '%s/bin/clang' % self.deps_cpp_info['llvm'].rootpath
+        cmake.definitions['CMAKE_C_FLAGS'] = '-Oz'
+        cmake.definitions['CMAKE_SKIP_BUILD_RPATH'] = True
+        cmake.definitions['CMAKE_BUILD_WITH_INSTALL_NAME_DIR'] = True
+        cmake.definitions['CMAKE_INSTALL_NAME_DIR'] = '@rpath'
+        cmake.definitions['CMAKE_OSX_ARCHITECTURES'] = 'x86_64;arm64'
+        cmake.definitions['CMAKE_OSX_DEPLOYMENT_TARGET'] = '10.11'
+        cmake.definitions['CMAKE_OSX_SYSROOT'] = self.deps_cpp_info['macos-sdk'].rootpath
+        cmake.definitions['BLACKMAGIC_SDK_DIR'] = self.platformDir
 
         tools.mkdir(self.build_dir)
         with tools.chdir(self.build_dir):
-            self.run('clang++ -oz "../%s/include"/DeckLinkAPIDispatch.cpp -I"../include" %s -stdlib=libc++ -install_name @rpath/libblackmagic.%s -o libblackmagic.%s' % (self.platformDir, platformBuild, self.libext, self.libext))
+            cmake.configure(source_dir='..', build_dir='.', args=['--no-warn-unused-cli'])
+            cmake.build()
+            self.run('install_name_tool -change @rpath/libc++.dylib /usr/lib/libc++.1.dylib lib/libblackmagic.dylib')
 
     def package(self):
         self.copy('*.h', src='include', dst='include')
-        self.copy('libblackmagic.%s' % self.libext, src='%s' % self.build_dir, dst='lib')
+        self.copy('libblackmagic.%s' % self.libext, src='%s/lib' % self.build_dir, dst='lib')
 
     def package_info(self):
         self.cpp_info.libs = ['blackmagic']
