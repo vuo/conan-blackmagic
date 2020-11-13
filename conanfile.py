@@ -5,7 +5,7 @@ import platform
 class BlackmagicConan(ConanFile):
     name = 'blackmagic'
 
-    source_version = '11.6'
+    source_version = '12.0b1'
     package_version = '0'
     version = '%s-%s' % (source_version, package_version)
 
@@ -33,13 +33,13 @@ class BlackmagicConan(ConanFile):
         else:
             raise Exception('Unknown platform "%s"' % platform.system())
 
-        self.platformDir = 'Blackmagic DeckLink SDK %s/%s' % (self.source_version, pf)
+        self.platformDir = 'Blackmagic DeckLink SDK 12.0/%s' % pf
 
     def source(self):
         tools.mkdir('include')
         tools.mkdir('lib')
-        tools.get('https://sw.blackmagicdesign.com/DeckLink/v11.6/Blackmagic_DeckLink_SDK_11.6.zip?Key-Pair-Id=APKAJTKA3ZJMJRQITVEA&Signature=bbLJJfKW8rXlPCA30sw0Q1N47ODcfmBkcVlK8KQ9ReWgSJ8NdGj118Lx5WgEB9Ee5oSWQp6y9Psk4lLT9dNF2GkTQFzFkcYMmr0RaCI6nINen3Hem1XkuwhFNsDCoDUsh8PCI0aVZ8QQoADGfhHe8Ui2HJtAjkFkybX1hXWc62V/3CaBSSU83Gtl1qWWSaXU1jDILnzdt0sQ619hXghGzuVP9rDim5GukzysrORgChJJv5Al2S7QUaAd/cPYweSm1Ms7Nr+qlOxzVnaXrn28NHBLNmgvTrCRiipxOlWBSp++mzHUFK/wOU/YgHrepNp7dRQ80q/6nxjKbvVafl8LPA==&Expires=1604983396',
-            sha256='2cecde0b6af98ef3cefa425ec0595849fb30a26da4063becd80582dbc0483183',
+        tools.get('https://sw.blackmagicdesign.com/DeckLink/v12.0b1/Blackmagic_DeckLink_SDK_12.0b1.zip?Key-Pair-Id=APKAJTKA3ZJMJRQITVEA&Signature=fs6/neY2mVgnq43baM9B4rvUsKLcxr9QK4hqyQH4KmkJ0UqOHczqQTsuqg8Ef7Y8XWf2CbtEYWVdhYj2Q53Rd2NFgw56IMtUSgiEwqRGtfnPzcq6knuSaQxJpeRxU064RmCgE3c8f8YO6TQcz1A+CfiK4XdaQXeNKoVa23jn7cxhrtjUhMKZJdZlBza6mVGN250uz8Sjrk3Ecz8gpUfjIZSHIc3y8Q84HEuvYBuB+wQ5sI0/ZV/lVEyFclgxKmUjAEvMPJ8qHa67ApMkAc/LeBjDrUS9J33jWsluQLWw0/E7MrfiMLgvbNa821QDiFyK0LY9ugB4D/6Xmnk1mqOVtA==&Expires=1605312609',
+            sha256='de130619540da2d4bdcd2d2d128fcf509959415f6d80e0b8a8fbf15375508415',
             filename='sdk.zip')
 
         self.run('mv "%s/include"/*.h include' % self.platformDir)
